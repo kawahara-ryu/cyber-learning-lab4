@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cyber Python Demo: Lists Factory</title>
+<link rel="stylesheet" href="style.css?v=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+<div id="header">
+  <button class="nav-btn" onclick="prevStep()">◀ Prev</button>
+  <div class="step-indicator" id="step-display">4-1. リストの宣言と代入</div>
+  <button class="nav-btn" onclick="nextStep()">Next ▶</button>
+</div>
+
+<div id="memory-hud">[MEMORY]<br><span id="mem-content">Wait...</span></div>
+
+<div id="code-monitor">
+  <div class="monitor-header">list_factory.py</div>
+  <pre id="code-content"></pre>
+</div>
+
+<div id="trace-log">
+  <div class="log-header">TRACE LOG</div>
+  <div id="log-content"></div>
+</div>
+
+<div id="content">
+  <!-- 4-1 -->
+  <div class="step-panel" id="step-1">
+    <h2>4-1. リストの宣言と代入・上書き</h2>
+    <div class="code-block">foods = ['apple', 'banana', 'corn']<br>foods[1] = 'melon'</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(1, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(1, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-2 -->
+  <div class="step-panel" id="step-2">
+    <h2>4-2. リストに要素を追加 (append)</h2>
+    <div class="code-block">foods.append('daikon')</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(2, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(2, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-3 -->
+  <div class="step-panel" id="step-3">
+    <h2>4-3. 2つのリストを統合 (extend)</h2>
+    <div class="code-block">drinks = ['tea', 'soda', 'milk']<br>foods.extend(drinks)</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(3, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(3, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-4 -->
+  <div class="step-panel" id="step-4">
+    <h2>4-4. リストの長さ (len)</h2>
+    <div class="code-block">print(len(foods))</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(4, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(4, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-5 -->
+  <div class="step-panel" id="step-5">
+    <h2>4-5. 反復(for)でリストの添字を操作</h2>
+    <div class="code-block">for i in range(4):<br>  print(foods[i])</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(5, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(5, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-6 -->
+  <div class="step-panel" id="step-6">
+    <h2>4-6. 要素の平均値を求める</h2>
+    <div class="code-block">sum += number[i]<br>average = sum / len(number)</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(6, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(6, true)">▶ AUTO</button>
+    </div>
+  </div>
+  
+  <!-- 4-7 -->
+  <div class="step-panel" id="step-7">
+    <h2>4-7. 入力された値の合計</h2>
+    <div class="code-block">number[i] = input(...)<br>sum += int(number[i])</div>
+    <div class="control-group">
+      <button class="run-btn step-btn" onclick="triggerStep(7, false)">⏭ STEP</button>
+      <button class="run-btn auto-btn" onclick="triggerStep(7, true)">▶ AUTO</button>
+    </div>
+  </div>
+</div>
+
+<div id="factory-floor">
+  <!-- JavaScript will inject dynamic arrays and animations here -->
+</div>
+<script src="main.js?v=1"></script>
+</body>
+</html>
