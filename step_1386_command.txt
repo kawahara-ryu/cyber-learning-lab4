@@ -1,0 +1,498 @@
+﻿$targetFile = "C:\Users\ryuto\.gemini\web-joho1\（4章_プログラミング実践④）配列リスト工場サイバーデモ_新版\main.js"
+$tempFile = "C:\Users\ryuto\.gemini\web-joho1\（4章_プログラミング実践④）配列リスト工場サイバーデモ_新版\temp.js"
+Copy-Item $tempFile $targetFile -Force
+
+$appendCode = @"
+
+// =================================================================
+// Runtime Execution Controller (統一ステップ進行エンジン)
+// =================================================================
+// 以下のコードは、以前の完全な状態から復元した関数群です。
+
+let currentStepIdx = 0;
+let currentExecIdx = -1; // 実行プラン中の現在インデックス
+let executionPlan = [];
+let stepParams = {};
+let autoTimer = null;
+let autoSpeed = 1000;
+
+function initStep(stepIdx) {
+  currentStepIdx = stepIdx;
+  currentExecIdx = -1;
+  stopAuto();
+
+  const stepDef = stepsData[currentStepIdx];
+
+  // Header更新
+  if(document.getElementById('step-title')) document.getElementById('step-title').innerText = stepDef.title;
+  if(document.getElementById('step-badge')) document.getElementById('step-badge').innerText = stepDef.badge;
+
+  // パラメータ初期化
+  stepParams = {};
+  if (stepDef.params) {
+    stepDef.params.forEach(p => {
+      stepParams[p.id] = p.default;
+    });
+  }
+
+  setupTraceTableHeaders(stepTraceHeaders[currentStepIdx]);
+  renderParamBar(stepDef.params);
+  renderCode();
+  rebuildExecutionPlan();
+
+  // 画面・内部状態のリセット
+  clearFactory();
+  clearMemoryRack();
+  clearLoopStage();
+  clearTerminal();
+  clearTraceTable();
+
+  setExplanation("準備完了。「⏭ STEP」または Spaceキーで1行ずつループ処理を実行してみよう！");
+  playBeep();
+}
+
+function renderParamBar(paramsList) {
+  const bar = document.getElementById('param-config-bar');
+  const container = document.getElementById('param-controls');
+  
+  if (!container || !bar) return;
+  
+  container.innerHTML = '';
+
+  if (!paramsList || paramsList.length === 0) {
+    bar.style.display = 'none';
+    return;
+  }
+  bar.style.display = 'flex';
+
+  paramsList.forEach(p => {
+    const lbl = document.createElement('label');
+    lbl.innerText = p.label + ": ";
+    let inp;
+    if (p.type === 'number') {
+      inp = document.createElement('input');
+      inp.type = 'number';
+      inp.min = p.min;
+      inp.max = p.max;
+      inp.value = p.default;
+    } else if (p.type === 'text') {
+      inp = document.createElement('input');
+      inp.type = 'text';
+      inp.value = p.default;
+    }
+    inp.onchange = (e) => {
+      stepParams[p.id] = p.type === 'number' ? parseInt(e.target.value) : e.target.value;
+      rebuildExecutionPlan();
+      renderCode();
+      clearTraceTable();
+      clearFactory();
+      clearTerminal();
+      clearMemoryRack();
+      currentExecIdx = -1;
+      setExplanation("パラメータが変更されました。最初から実行します。");
+    };
+    lbl.appendChild(inp);
+    container.appendChild(lbl);
+  });
+}
+
+function rebuildExecutionPlan() {
+  const stepDef = stepsData[currentStepIdx];
+  executionPlan = stepDef.generateExecutionPlan(stepParams);
+}
+
+function renderCode() {
+  const stepDef = stepsData[currentStepIdx];
+  const codeLines = stepDef.codeLines(stepParams);
+  const codeContent = document.getElementById('code-content');
+  if (!codeContent) return;
+  codeContent.innerHTML = '';
+
+  codeLines.forEach((line, idx) => {
+    const row = document.createElement('div');
+    row.className = 'code-line';
+    row.id = \`code-line-\${idx}\`;
+
+    let indentHtml = '';
+    const indentCount = line.indent || 0;
+    for (let i = 0; i < indentCount; i++) {
+      indentHtml += '<span class="indent-tab"></span>';
+    }
+
+    const trimmedCode = line.code.trimStart();
+    const highlightedCode = highlightSyntax(escapeHtml(trimmedCode));
+    const commStr = line.comment ? \` <span class="hl-comment">\${escapeHtml(line.comment)}</span>\` : '';
+
+    row.innerHTML = \`
+      <span class="line-num">\${line.lineNo}</span>
+      <span class="line-text">\${indentHtml}\${highlightedCode}\${commStr}</span>
+    \`;
+    codeContent.appendChild(row);
+  });
+}
+
+function escapeHtml(str) {
+  return str.replace(/[&<>"']/g, function(m) {
+    return {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[m];
+  });
+}
+
+function highlightSyntax(code) {
+  const strPlaceholders = [];
+  let res = code.replace(/('(?:\\\\'|[^'])*'|"(?:\\\\"|[^"])*")/g, (m) => {
+    strPlaceholders.push(m);
+    return \`___STR_\${strPlaceholders.length - 1}___\`;
+  });
+
+  res = res.replace(/\\b(for|while|in|if|else|break)\\b/g, (match) => {
+    if (['for', 'while', 'break', 'if', 'else'].includes(match)) {
+      return \`<span class="hl-keyword keyword-help" data-word="\${match}">\${match}</span>\`;
+    }
+    return \`<span class="hl-keyword">\${match}</span>\`;
+  });
+  res = res.replace(/\\b(range|print|int|str|len|input)\\b/g, (match) => {
+    if (['range', 'print', 'len', 'input', 'int'].includes(match)) {
+      return \`<span class="hl-func keyword-help" data-word="\${match}">\${match}</span>\`;
+    }
+    return \`<span class="hl-func">\${match}</span>\`;
+  });
+  
+  res = res.replace(/\\.(append|extend)\\b/g, (match, p1) => {
+    return \`.\<span class="hl-func keyword-help" data-word="\${p1}">\${p1}</span>\`;
+  });
+
+  res = res.replace(/\\b(\\d+)\\b/g, '<span class="hl-number">$1</span>');
+
+  res = res.replace(/___STR_(\\d+)___/g, (match, p1) => {
+    return \`<span class="hl-string">\${strPlaceholders[p1]}</span>\`;
+  });
+  return res;
+}
+
+function formatCode(code) {
+  return highlightSyntax(escapeHtml(code));
+}
+
+function highlightCurrentLine(lineIdx) {
+  const stepDef = stepsData[currentStepIdx];
+  const codeLines = stepDef.codeLines(stepParams);
+
+  codeLines.forEach((_, idx) => {
+    const row = document.getElementById(\`code-line-\${idx}\`);
+    if (!row) return;
+    row.classList.remove('active');
+    if (idx === lineIdx) {
+      row.classList.add('active');
+      const scrollArea = document.getElementById('code-scroll-area');
+      if (scrollArea) {
+        const rowTop = row.offsetTop;
+        const rowHeight = row.offsetHeight;
+        const areaScrollTop = scrollArea.scrollTop;
+        const areaHeight = scrollArea.clientHeight;
+
+        if (rowTop < areaScrollTop) {
+          scrollArea.scrollTop = rowTop - 20;
+        } else if (rowTop + rowHeight > areaScrollTop + areaHeight) {
+          scrollArea.scrollTop = rowTop + rowHeight - areaHeight + 20;
+        }
+      }
+    }
+  });
+}
+
+function clearFactory() {
+  const floor = document.getElementById('factory-floor');
+  if (floor) floor.innerHTML = '';
+}
+function clearMemoryRack() { }
+function clearLoopStage() { }
+function clearTerminal() {
+  const term = document.getElementById('terminal-output');
+  if (term) term.innerHTML = '';
+}
+function clearTraceTable() {
+  const tbody = document.getElementById('trace-tbody');
+  if (tbody) tbody.innerHTML = '';
+}
+
+function setExplanation(text) {
+  const exp = document.getElementById('exp-text');
+  if (exp) exp.innerHTML = text;
+}
+
+function playStep() {
+  if (currentExecIdx >= executionPlan.length - 1) {
+    setExplanation("処理はすべて終了しました。");
+    stopAuto();
+    return;
+  }
+  
+  if (currentExecIdx === -1) {
+    clearFactory();
+    clearTerminal();
+    clearTraceTable();
+  }
+
+  currentExecIdx++;
+  const action = executionPlan[currentExecIdx];
+
+  // 1) コード行ハイライト
+  if (action.line !== undefined) {
+    highlightCurrentLine(action.line);
+  }
+
+  // 2) 解説テキスト
+  if (action.exp) {
+    setExplanation(action.exp);
+  }
+
+  // 3) アクション実行
+  if (action.type === 'assign') {
+    action.value.forEach((val, i) => {
+      createListBox(val, i, 400); // Animation start Y
+    });
+  } else if (action.type === 'append') {
+    const curCount = document.querySelectorAll('.list-box').length;
+    createListBox(action.value, curCount, 400);
+  } else if (action.type === 'extend') {
+    const curCount = document.querySelectorAll('.list-box').length;
+    action.value.forEach((val, i) => {
+      createListBox(val, curCount + i, 400);
+    });
+  } else if (action.type === 'replace') {
+    const boxes = document.querySelectorAll('.list-box');
+    if (boxes[action.index]) {
+      // Create new box above it and drop
+      createListBox(action.value, action.index, 400, true);
+    }
+  } else if (action.type === 'print') {
+    appendTerminal(action.output);
+  } else if (action.type === 'read') {
+    const boxes = document.querySelectorAll('.list-box');
+    if (boxes[action.index]) {
+      boxes[action.index].classList.add('highlight-read');
+      setTimeout(() => {
+        if(boxes[action.index]) boxes[action.index].classList.remove('highlight-read');
+      }, 800);
+    }
+  } else if (action.type === 'addTrace') {
+    addTraceRow(action.round, action.hlClass, action.code, action.varVal, action.cond, action.output);
+  }
+
+  // ミニゲーム関連のフック (後で組み込む想定)
+  if (action.type === 'quiz') {
+      showQuiz(currentStepIdx);
+      stopAuto(); // クイズで一時停止
+  }
+
+  playBeep();
+}
+
+function nextStep() {
+  if (currentStepIdx < stepsData.length - 1) {
+    initStep(currentStepIdx + 1);
+  }
+}
+
+function prevStep() {
+  if (currentStepIdx > 0) {
+    initStep(currentStepIdx - 1);
+  }
+}
+
+function toggleAuto() {
+  if (autoTimer) {
+    stopAuto();
+  } else {
+    document.getElementById('auto-btn').innerText = "⏸ STOP";
+    document.getElementById('auto-btn').classList.add('active');
+    autoTimer = setInterval(() => {
+      playStep();
+      if (currentExecIdx >= executionPlan.length - 1) {
+        stopAuto();
+      }
+    }, autoSpeed);
+  }
+}
+
+function stopAuto() {
+  if (autoTimer) {
+    clearInterval(autoTimer);
+    autoTimer = null;
+  }
+  const btn = document.getElementById('auto-btn');
+  if (btn) {
+    btn.innerText = "▶ AUTO";
+    btn.classList.remove('active');
+  }
+}
+
+function resetStep() {
+  initStep(currentStepIdx);
+}
+
+// ツールチップ関連
+document.addEventListener('mouseover', function(e) {
+  if (e.target.classList.contains('keyword-help')) {
+    const word = e.target.getAttribute('data-word');
+    if (keywordDict[word]) {
+      showTooltip(e.target, keywordDict[word]);
+    }
+  }
+});
+document.addEventListener('mouseout', function(e) {
+  if (e.target.classList.contains('keyword-help')) {
+    hideTooltip();
+  }
+});
+
+function showTooltip(el, text) {
+  let tt = document.getElementById('cyber-tooltip');
+  if (!tt) {
+    tt = document.createElement('div');
+    tt.id = 'cyber-tooltip';
+    tt.className = 'cyber-tooltip';
+    
+    const catIcon = document.createElement('img');
+    catIcon.src = 'https://i.imgur.com/3VqX0X7.png'; // Hacker Cat icon placeholder
+    catIcon.className = 'tooltip-icon';
+    tt.appendChild(catIcon);
+    
+    const txt = document.createElement('span');
+    txt.className = 'tooltip-text';
+    tt.appendChild(txt);
+    
+    document.body.appendChild(tt);
+  }
+  tt.querySelector('.tooltip-text').innerText = text;
+  
+  const rect = el.getBoundingClientRect();
+  tt.style.left = (rect.left) + 'px';
+  tt.style.top = (rect.bottom + 5) + 'px';
+  tt.style.display = 'flex';
+  tt.style.opacity = '1';
+}
+
+function hideTooltip() {
+  const tt = document.getElementById('cyber-tooltip');
+  if (tt) {
+    tt.style.opacity = '0';
+    setTimeout(() => { tt.style.display = 'none'; }, 200);
+  }
+}
+
+function createListBox(value, index, startY, isReplace = false) {
+  const floor = document.getElementById('factory-floor');
+  if (!floor) return;
+  const box = document.createElement('div');
+  box.className = 'list-box new-item';
+  box.innerHTML = \`<div class="box-index">[\${index}]</div><div class="box-value">\${value}</div>\`;
+  box.style.left = (20 + index * 100) + 'px';
+  box.style.top = startY + 'px'; // Drop from top
+  
+  floor.appendChild(box);
+  
+  // アニメーション (Drop down to conveyor)
+  setTimeout(() => {
+    box.style.top = '100px';
+  }, 50);
+
+  if (isReplace) {
+    // 既存のボックスを破壊して入れ替え
+    const existing = Array.from(floor.querySelectorAll('.list-box')).find(b => b !== box && b.style.left === box.style.left);
+    if (existing) {
+      existing.classList.add('destroyed');
+      setTimeout(() => existing.remove(), 500);
+    }
+  }
+}
+
+function appendTerminal(text) {
+  const term = document.getElementById('terminal-output');
+  if (!term) return;
+  const div = document.createElement('div');
+  div.innerText = text;
+  term.appendChild(div);
+  term.scrollTop = term.scrollHeight;
+}
+
+function playBeep() {
+  // Beep音 (省略)
+}
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    playStep();
+  } else if (e.code === 'ArrowRight') {
+    nextStep();
+  } else if (e.code === 'ArrowLeft') {
+    prevStep();
+  }
+});
+
+let isZoomed = false;
+function toggleZoom() {
+  isZoomed = !isZoomed;
+  if (isZoomed) {
+    document.body.style.zoom = "1.5";
+    document.getElementById('zoom-btn').innerText = "🔍 ZOOM OUT";
+  } else {
+    document.body.style.zoom = "1.0";
+    document.getElementById('zoom-btn').innerText = "🔍 ZOOM IN";
+  }
+}
+
+function addTraceRow(round, lineNo, code, varVal, cond, output) {
+  const tbody = document.getElementById('trace-tbody');
+  if (!tbody) return;
+  const tr = document.createElement('tr');
+  
+  if (Array.isArray(round)) {
+    const highlightClass = lineNo || '';
+    if (highlightClass) tr.className = 'new-row ' + highlightClass;
+    else tr.className = 'new-row';
+    
+    round.forEach((val, idx) => {
+      const td = document.createElement('td');
+      if (idx === 0) {
+        td.style.color = 'var(--neon-cyan)';
+        td.style.fontWeight = 'bold';
+      } else if (idx === round.length - 1) {
+        td.style.color = 'var(--neon-green)';
+      }
+      td.style.fontFamily = "'Fira Code', monospace";
+      td.innerHTML = (val !== undefined && val !== null) ? val : '-';
+      tr.appendChild(td);
+    });
+  } else {
+    tr.className = 'new-row';
+    tr.innerHTML = \`
+      <td>\${round !== undefined ? round : '-'}</td>
+      <td>\${code || '-'}</td>
+      <td>\${varVal || '-'}</td>
+    \`;
+  }
+  
+  tbody.appendChild(tr);
+  const tableContainer = tbody.parentElement ? tbody.parentElement.parentElement : null;
+  if (tableContainer) {
+    tableContainer.scrollTop = tableContainer.scrollHeight;
+  }
+}
+
+// 初期化実行
+window.onload = () => {
+  initStep(0);
+};
+
+"@
+
+Add-Content -Path $targetFile -Value $appendCode -Encoding UTF8
+Write-Output "Restored main.js"

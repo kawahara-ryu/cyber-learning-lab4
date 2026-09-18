@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cyber Python Demo: Loops (FOR, WHILE, BREAK)</title>
+<link rel="stylesheet" href="style.css?v=1">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+</head>
+<body>
+
+<!-- Header -->
+<div id="header">
+  <button class="nav-btn" onclick="prevStep()" title="前のステップへ (←キー)">◀ Prev</button>
+  <div class="step-indicator" id="step-display">3-1. 反復(for)① range(5)</div>
+  <button class="nav-btn" onclick="nextStep()" title="次のステップへ (→キー)">Next ▶</button>
+  <div class="header-tools">
+    <button class="tool-btn" id="zoom-btn" onclick="toggleZoom()" title="プロジェクター用文字拡大">🔍 ZOOM</button>
+  </div>
+</div>
+
+<!-- Main 3-Column Layout -->
+<div id="app-container">
+
+  <!-- Left Column: Code Monitor & Controls -->
+  <div id="left-panel">
+    <div class="panel-box" id="code-box">
+      <div class="panel-header">
+        <span class="file-name">📄 app.py (Google Colab Cell)</span>
+        <span class="step-badge" id="step-badge">Step 1/8</span>
+      </div>
+      <div id="code-scroll-area">
+        <div id="code-content"></div>
+      </div>
+    </div>
+
+    <!-- Parameter Changer (実験用入力フォーム) -->
+    <div id="input-param-bar" style="display:none;">
+      <span class="param-label">🎮 パラメータ変更:</span>
+      <div id="param-controls"></div>
+      <button class="param-apply-btn" onclick="applyParamsAndRun()">再実行 🔄</button>
+    </div>
+
+    <!-- Controls -->
+    <div class="panel-box" id="control-box">
+      <div class="control-btn-group">
+        <button class="ctrl-btn" id="btn-back" onclick="stepBack()" title="1ステップ戻る">⏮ BACK</button>
+        <button class="ctrl-btn primary" id="btn-step" onclick="stepForward()" title="1ステップ進む (Spaceキー)">⏭ STEP</button>
+        <button class="ctrl-btn" id="btn-auto" onclick="toggleAuto()" title="自動実行">▶ AUTO</button>
+        <button class="ctrl-btn" id="btn-reset" onclick="resetCurrentStep()" title="リセット">🔄 RESET</button>
+      </div>
+      <!-- Teacher's / CPU Explanation Bubble -->
+      <div id="explanation-card">
+        <div class="exp-title">💡 内部処理の解説</div>
+        <div class="exp-body" id="exp-text">準備完了。「⏭ STEP」または Spaceキーで1行ずつループ処理を実行してみよう！</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center Column: Computer Internal (RAM, Loop Meter & Physics) -->
+  <div id="center-panel">
+    <div class="center-header">
+      <span>⚙️ コンピュータ内部処理 (CPU & Loop Controller)</span>
+      <span class="status-indicator" id="cpu-status">READY</span>
+    </div>
+
+    <!-- Memory Rack (Variable Boxes) -->
+    <div id="memory-rack-container">
+      <div class="rack-label">📦 変数メモリ (RAM)</div>
+      <div id="var-boxes-grid">
+        <div class="no-var-msg" id="no-var-msg">代入された変数はまだありません</div>
+      </div>
+    </div>
+
+    <!-- Loop Visualizer Stage (円形メーター & 条件・break演出) -->
+    <div id="loop-display">
+      <div id="loop-visual-stage"></div>
+    </div>
+
+    <!-- Matter.js Physics Floor -->
+    <div id="world"></div>
+  </div>
+
+  <!-- Right Column: Colab Terminal & Trace Table -->
+  <div id="right-panel">
+    <!-- Terminal Output -->
+    <div class="panel-box" id="terminal-box">
+      <div class="panel-header terminal-header">
+        <span>💻 実行結果 (Colab 出力)</span>
+        <button class="clear-btn" onclick="clearTerminal()">消去</button>
+      </div>
+      <div id="terminal-screen">
+        <div class="term-line prompt">Python 3.10.12 (Google Colaboratory)</div>
+        <div id="term-output-list"></div>
+      </div>
+    </div>
+
+    <!-- Trace Table -->
+    <div class="panel-box" id="trace-box">
+      <div class="panel-header trace-header">
+        <span>📊 反復処理トレース表</span>
+      </div>
+      <div class="trace-table-container">
+        <table class="cyber-trace-table" id="trace-table">
+          <thead id="trace-thead">
+            <tr>
+              <th style="width: 32px;">周</th>
+              <th style="width: 26px;">行</th>
+              <th style="width: 110px;">実行コード</th>
+              <th style="width: 85px;" id="th-var1">変数</th>
+              <th style="width: 105px;" id="th-cond">判定 / 計算</th>
+              <th>画面出力</th>
+            </tr>
+          </thead>
+          <tbody id="trace-tbody">
+            <!-- Dynamic Rows -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hacker Cat Tooltip -->
+<div id="hacker-tooltip" class="hacker-tooltip hidden">
+  <div class="hacker-icon">🐱💻</div>
+  <div class="hacker-speech" id="hacker-speech-text"></div>
+</div>
+
+<!-- Quiz Overlay -->
+<div id="quiz-overlay" class="quiz-overlay hidden">
+  <div class="quiz-card">
+    <div class="quiz-header">🤔 次に何が起こるか予測せよ！</div>
+    <div class="quiz-question" id="quiz-question">sum の値はどうなる？</div>
+    <div class="quiz-choices" id="quiz-choices">
+      <!-- 選択肢がJSから挿入される -->
+    </div>
+    <div class="quiz-feedback hidden" id="quiz-feedback">
+      <div id="quiz-feedback-msg">正解！</div>
+      <div id="quiz-feedback-exp" class="quiz-exp">解説が入ります。</div>
+      <button class="quiz-next-btn" id="quiz-next-btn" onclick="resumeFromQuiz()">⏩ 処理を再開する</button>
+    </div>
+  </div>
+</div>
+<script src="main.js?v=1"></script>
+</body>
+</html>
